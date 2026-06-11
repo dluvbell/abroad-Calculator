@@ -77,16 +77,26 @@
                             <label class="block text-xs text-gray-400 mb-1">연 연금 총액 (Gross CAD)</label>
                             <input type="number" id="grossPension" value="40000" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
                         </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs text-gray-400 mb-1">캐나다 원천징수세율 (%)</label>
-                                <input type="number" id="caTaxRate" value="25" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
-                                <span class="text-[10px] text-gray-500 block mt-0.5">조약: TH 25% / MY 15%</span>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">캐나다 원천징수세율 (%)</label>
+                            <input type="number" id="caTaxRate" value="25" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <span class="text-[10px] text-gray-500 block mt-0.5">조약: TH 25% / MY 15%</span>
+                        </div>
+
+                        <div class="bg-gray-900 p-3 rounded border border-gray-800">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-gray-300">지출 명세 (CAD · 기간별 가변)</span>
+                                <button onclick="addExpenseRow()" class="text-[11px] bg-teal-700 hover:bg-teal-600 text-white px-2 py-0.5 rounded cursor-pointer">+ 지출 항목 추가</button>
                             </div>
-                            <div>
-                                <label class="block text-xs text-gray-400 mb-1">연 기본 생활비 (현지화)</label>
-                                <input type="number" id="baseExpense" value="800000" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <p class="text-[10px] text-gray-500 mb-2">※ 모든 금액은 <b>CAD 기준</b>(국가 무관). 매년 <b>[시작 ≤ 해당연도 ≤ 종료]</b> 항목만 합산하며, FX 변동 시 실질 CAD 부담은 환율에 따라 조정됩니다.</p>
+                            <div class="grid grid-cols-12 gap-1.5 mb-1 text-[10px] text-gray-500 px-0.5">
+                                <span class="col-span-4">항목명</span>
+                                <span class="col-span-3">연 지출(CAD)</span>
+                                <span class="col-span-2">시작</span>
+                                <span class="col-span-2">종료</span>
+                                <span class="col-span-1"></span>
                             </div>
+                            <div id="expenseRows" class="space-y-1.5"></div>
                         </div>
                     </div>
                 </div>
@@ -359,6 +369,42 @@
             })).filter(e => !isNaN(e.year));
         }
 
+        // ---------- 가변 지출 명세 행 (개수 제한 없음) ----------
+        function addExpenseRow(name = '신규 항목', amount = 0, start = 2026, end = 2060) {
+            const wrap = document.getElementById('expenseRows');
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-12 gap-1.5 items-center expense-row';
+            div.innerHTML = `
+                <input type="text" class="ex-name col-span-4 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${name}">
+                <input type="number" class="ex-amt col-span-3 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${amount}">
+                <input type="number" class="ex-start col-span-2 bg-gray-950 border border-gray-700 rounded px-1.5 py-1 text-xs text-white" value="${start}">
+                <input type="number" class="ex-end col-span-2 bg-gray-950 border border-gray-700 rounded px-1.5 py-1 text-xs text-white" value="${end}">
+                <button onclick="removeExpenseRow(this)" class="col-span-1 text-rose-400 hover:text-rose-300 text-sm cursor-pointer" title="삭제">✕</button>
+            `;
+            wrap.appendChild(div);
+        }
+        function removeExpenseRow(btn) {
+            const row = btn.closest('.expense-row');
+            if (row) row.remove();
+        }
+        // 지출 명세 수집: 이름/금액/시작년도/종료년도 컬렉션
+        function getExpenseItems() {
+            return [...document.querySelectorAll('.expense-row')].map(r => ({
+                name: r.querySelector('.ex-name').value,
+                amount: parseFloat(r.querySelector('.ex-amt').value) || 0,
+                start: parseInt(r.querySelector('.ex-start').value),
+                end: parseInt(r.querySelector('.ex-end').value)
+            })).filter(e => !isNaN(e.start) && !isNaN(e.end));
+        }
+        // 특정 연도에 활성화된 지출액 합산 [start <= year <= end]
+        function sumExpenseForYear(items, year) {
+            let total = 0;
+            for (const it of items) {
+                if (it.start <= year && year <= it.end) total += it.amount;
+            }
+            return total;
+        }
+
         // ---------- 표준정규 난수 (Box-Muller) ----------
         function randn() {
             let u = 0, v = 0;
@@ -455,7 +501,7 @@
 
             const grossPension = getNum('grossPension', 0);
             const caTaxRate = getNum('caTaxRate', 0);
-            const baseExpenseLocal = getNum('baseExpense', 0);
+            const expenseItems = getExpenseItems();
 
             const wG = getNum('wGrowth', 0) / 100;
             const wC = getNum('wCc', 0) / 100;
@@ -551,17 +597,20 @@
                     if (assetDiv < 0) assetDiv = 0;
 
                     // 2. 분배율/지출 확정 (분배율은 NAV 대비 고정)
-                    let activeExpenseLocal = baseExpenseLocal;
+                    // 지출은 CAD 기준 입력. 해당 연도 활성 항목만 합산 [start <= year <= end]
+                    let baseExpenseThisYear = sumExpenseForYear(expenseItems, currentYear);
+                    let activeExpenseCAD = baseExpenseThisYear;
                     let ccYield = isMonte ? Math.max(0, normalDraw(yieldCc, divVolCc)) : yieldCc;
                     let divYield = isMonte ? Math.max(0, normalDraw(yieldDiv, divVolDiv)) : yieldDiv;
 
                     if (isCrash) {
-                        activeExpenseLocal = baseExpenseLocal * (1 - expenseReduction);
+                        activeExpenseCAD = baseExpenseThisYear * (1 - expenseReduction);
                         let premium = isMonte ? Math.abs(gChange) * ccMultiplier : Math.abs(gChange) * ccMultiplier;
                         ccYield += premium;
                     }
 
-                    let expenseCAD = activeExpenseLocal / exRate;
+                    // CAD 지출에 FX 변동 반영: t0 환율 대비 현재 환율로 실질 CAD 부담 조정(CAD 강세→지출↓)
+                    let expenseCAD = activeExpenseCAD * (exRate0 / exRate);
 
                     // 3. 인컴 기반 지출 충당 (연금 → 배당 → 원금)
                     let ccDividend = assetCc * ccYield;
@@ -703,15 +752,54 @@
             }
         }
 
+        // ---------- 차트: 터치/호버 시 수직선 + 해당 연도 값 표시 ----------
+        const verticalHoverLine = {
+            id: 'verticalHoverLine',
+            afterDatasetsDraw(chart) {
+                const active = chart.tooltip && chart.tooltip._active;
+                if (!active || !active.length) return;
+                const ctx = chart.ctx;
+                const x = active[0].element.x;
+                const top = chart.scales.y.top;
+                const bottom = chart.scales.y.bottom;
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, top);
+                ctx.lineTo(x, bottom);
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.7)';
+                ctx.stroke();
+                ctx.restore();
+            }
+        };
+
         function updateChart(labels, datasets) {
             const ctx = document.getElementById('mainChart').getContext('2d');
             if (myChartInstance) myChartInstance.destroy();
             myChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: { labels, datasets },
+                plugins: [verticalHoverLine],
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 11 } } } },
+                    // 그래프 어디를 터치/호버하든 가장 가까운 연도(x축) 기준으로 표시
+                    interaction: { mode: 'index', intersect: false, axis: 'x' },
+                    hover: { mode: 'index', intersect: false, axis: 'x' },
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 11 } } },
+                        tooltip: {
+                            mode: 'index', intersect: false,
+                            backgroundColor: 'rgba(2, 6, 23, 0.92)',
+                            borderColor: '#334155', borderWidth: 1,
+                            titleColor: '#e2e8f0', bodyColor: '#cbd5e1',
+                            padding: 10,
+                            callbacks: {
+                                title: (items) => (items.length ? `${items[0].label}년` : ''),
+                                label: (item) => `${item.dataset.label}: ${Math.round(item.parsed.y).toLocaleString()} CAD`
+                            }
+                        }
+                    },
                     scales: {
                         x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
                         y: {
@@ -728,6 +816,10 @@
 
         window.onload = function () {
             addCrashRow(2030, 30, 25); // 기본 크래시 1개
+            // 샘플 지출 항목 (CAD · 기간별 가변)
+            addExpenseRow('기본 생활비', 24000, 2026, 2060);
+            addExpenseRow('주거비 (월세)', 12000, 2026, 2060);
+            addExpenseRow('초기 정착비', 10000, 2026, 2028);
             toggleCountryOptions();
             validateWeights();
             runSimulation('simple');

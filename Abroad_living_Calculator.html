@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실질 가치 은퇴 재정 시뮬레이터 (정정 통합본 v2)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans antialiased">
+
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <header class="border-b border-gray-800 pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-white tracking-tight">Real-Terms Retirement Financial Simulator</h1>
+            <p class="text-xs text-gray-400 mt-1">인플레이션 제거 실질가치 기반 · 국가별 세법 · 다중 크래시 · 로그정규 수익률 · FX 리스크 연동 (정정 통합본 v2)</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="space-y-6 lg:col-span-1 bg-gray-950 p-5 rounded-xl border border-gray-800 h-fit">
+
+                <div>
+                    <h2 class="text-sm font-semibold text-teal-400 mb-3 uppercase tracking-wider">1. 기본 환경 설정</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">시작년도</label>
+                            <input type="number" id="startYear" value="2026" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">종료년도</label>
+                            <input type="number" id="endYear" value="2060" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="block text-xs text-gray-400 mb-1">거주 대상국 선택</label>
+                        <div class="flex gap-4 bg-gray-900 p-2 rounded border border-gray-700">
+                            <label class="flex items-center text-sm cursor-pointer select-none">
+                                <input type="radio" name="country" value="TH" checked onchange="toggleCountryOptions()" class="mr-2 accent-teal-500"> 태국 (방콕)
+                            </label>
+                            <label class="flex items-center text-sm cursor-pointer select-none">
+                                <input type="radio" name="country" value="MY" onchange="toggleCountryOptions()" class="mr-2 accent-teal-500"> 말레이시아
+                            </label>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">1 CAD 당 환율</label>
+                            <input type="number" id="exchangeRate" value="25.0" step="0.1" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <span id="exchangeRateUnit" class="text-[10px] text-gray-500 block mt-0.5">THB 기준</span>
+                        </div>
+                        <div class="flex items-end pb-1.5">
+                            <label class="flex items-center text-xs text-gray-300 cursor-pointer select-none" id="malaysiaFsiArea" style="display:none;">
+                                <input type="checkbox" id="myFsiExempt" checked class="mr-1.5 accent-teal-500"> FSI(국외원천) 비과세
+                            </label>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">환율 연 추세(%)</label>
+                            <input type="number" id="fxDrift" value="0" step="0.5" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <span class="text-[10px] text-gray-500 block mt-0.5">+면 CAD 강세(지출↓)</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">환율 연 변동성(%)</label>
+                            <input type="number" id="fxVol" value="6" step="0.5" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <span class="text-[10px] text-gray-500 block mt-0.5">몬테카를로 전용</span>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-gray-800">
+
+                <div>
+                    <h2 class="text-sm font-semibold text-teal-400 mb-3 uppercase tracking-wider">2. 인컴 & 지출 설정</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">연 연금 총액 (Gross CAD)</label>
+                            <input type="number" id="grossPension" value="40000" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">캐나다 원천징수세율 (%)</label>
+                                <input type="number" id="caTaxRate" value="25" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                                <span class="text-[10px] text-gray-500 block mt-0.5">조약: TH 25% / MY 15%</span>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">연 기본 생활비 (현지화)</label>
+                                <input type="number" id="baseExpense" value="800000" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-gray-800">
+
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-sm font-semibold text-teal-400 uppercase tracking-wider">3. 자산 및 리밸런싱 비중</h2>
+                        <span id="weightCheck" class="text-xs text-emerald-400 font-mono">합계: 100%</span>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mb-2">※ 초기자산은 <b>합계만</b> 사용되며, 시작 시점(t0)에 아래 목표비중으로 자동 정렬됩니다.</p>
+
+                    <div class="bg-gray-900 p-3 rounded border border-gray-800 mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-300">① 캐피탈게인형 (Growth)</span>
+                            <div class="flex items-center text-xs">
+                                <span class="text-gray-400 mr-1">비중:</span>
+                                <input type="number" id="wGrowth" value="40" onchange="validateWeights()" class="w-12 bg-gray-950 border border-gray-700 rounded px-1.5 py-0.5 text-center text-white text-xs font-mono"> %
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">초기 자산(CAD)</label>
+                                <input type="number" id="initGrowth" value="400000" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">실질 성장률(%)</label>
+                                <input type="number" id="rateGrowth" value="6" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">주가 변동률(%)</label>
+                                <input type="number" id="volGrowth" value="15" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900 p-3 rounded border border-gray-800 mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-300">② 커버드콜형 (Covered Call)</span>
+                            <div class="flex items-center text-xs">
+                                <span class="text-gray-400 mr-1">비중:</span>
+                                <input type="number" id="wCc" value="30" onchange="validateWeights()" class="w-12 bg-gray-950 border border-gray-700 rounded px-1.5 py-0.5 text-center text-white text-xs font-mono"> %
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-1.5">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">초기 자산(CAD)</label>
+                                <input type="number" id="initCc" value="300000" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">실질 성장률(%)</label>
+                                <input type="number" id="rateCc" value="2" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">주가 변동률(%)</label>
+                                <input type="number" id="volCc" value="12" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">실질 분배율(%)</label>
+                                <input type="number" id="yieldCc" value="10" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">분배 성장률(%)</label>
+                                <input type="number" id="divGgrowthCc" value="0" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">분배 변동률(%)</label>
+                                <input type="number" id="divVolCc" value="5" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900 p-3 rounded border border-gray-800">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-gray-300">③ 배당주형 (Dividend)</span>
+                            <div class="flex items-center text-xs">
+                                <span class="text-gray-400 mr-1">비중:</span>
+                                <input type="number" id="wDiv" value="30" onchange="validateWeights()" class="w-12 bg-gray-950 border border-gray-700 rounded px-1.5 py-0.5 text-center text-white text-xs font-mono"> %
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-1.5">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">초기 자산(CAD)</label>
+                                <input type="number" id="initDiv" value="300000" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">실질 성장률(%)</label>
+                                <input type="number" id="rateDiv" value="3" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">주가 변동률(%)</label>
+                                <input type="number" id="volDiv" value="14" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">실질 배당률(%)</label>
+                                <input type="number" id="yieldDiv" value="4" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">배당 성장률(%)</label>
+                                <input type="number" id="divGgrowthDiv" value="2" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">배당 변동률(%)</label>
+                                <input type="number" id="divVolDiv" value="4" class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-gray-800">
+
+                <div>
+                    <h2 class="text-sm font-semibold text-teal-400 mb-3 uppercase tracking-wider">4. 국면 제어 및 가변 지출</h2>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">크래시 하락률 트리거 (%)</label>
+                            <input type="number" id="crashTrigger" value="20" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">지출 줄어드는 비율 (%)</label>
+                            <input type="number" id="expenseReduction" value="15" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="block text-xs text-gray-400 mb-1">커버드콜 변동성 할증 계수</label>
+                        <input type="number" id="ccMultiplier" value="0.2" step="0.05" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                    </div>
+                    <div class="bg-gray-900 p-3 rounded border border-gray-800">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-amber-400">▼ 심플 시뮬레이션 전용 다중 크래시</span>
+                            <button onclick="addCrashRow()" class="text-[11px] bg-amber-700 hover:bg-amber-600 text-white px-2 py-0.5 rounded cursor-pointer">+ 시나리오 추가</button>
+                        </div>
+                        <div class="grid grid-cols-12 gap-2 mb-1 text-[10px] text-gray-500">
+                            <span class="col-span-4">발생 연도</span>
+                            <span class="col-span-3">하락률(%)</span>
+                            <span class="col-span-3">반등률(%)</span>
+                            <span class="col-span-2"></span>
+                        </div>
+                        <div id="crashRows" class="space-y-1.5"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 pt-2">
+                    <button id="btnSimple" onclick="runSimulation('simple')" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded text-sm transition-colors cursor-pointer">
+                        심플 시뮬레이션 실행 (시나리오 지정형)
+                    </button>
+                    <button id="btnMonte" onclick="runSimulation('monte')" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 rounded text-sm transition-colors cursor-pointer">
+                        몬테카를로 시뮬레이션 실행 (1,000회 랜덤)
+                    </button>
+                </div>
+
+            </div>
+
+            <div class="space-y-6 lg:col-span-2">
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 text-center sm:text-left">
+                        <span class="text-xs text-gray-400 block">최종 자산 생존 확률</span>
+                        <span id="resSurvivalRate" class="text-2xl font-bold font-mono text-teal-400 mt-1 block">-</span>
+                    </div>
+                    <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 text-center sm:text-left">
+                        <span class="text-xs text-gray-400 block">평균 자산 고갈 시점</span>
+                        <span id="resDepletionYear" class="text-2xl font-bold font-mono text-rose-400 mt-1 block">-</span>
+                    </div>
+                    <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 text-center sm:text-left">
+                        <span class="text-xs text-gray-400 block">누적 납부 세금 총합</span>
+                        <span id="resTotalTax" class="text-2xl font-bold font-mono text-gray-300 mt-1 block">-</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-950 p-5 rounded-xl border border-gray-800">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 id="chartTitle" class="text-sm font-semibold text-white">시뮬레이션 분석 궤적</h3>
+                        <span id="simBadge" class="text-xs px-2 py-0.5 rounded font-medium bg-gray-800 text-gray-400">대기 중</span>
+                    </div>
+                    <div class="relative w-full h-[320px] sm:h-[400px]">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-gray-950/50 p-4 rounded-xl border border-gray-800/80 text-xs text-gray-400 space-y-1.5 leading-relaxed">
+                    <p class="text-gray-300 font-medium">💡 핵심 연산 매커니즘 (정정 통합본 v2)</p>
+                    <p>• <b>수익률 모형(몬테카를로):</b> 자산 성장은 로그정규분포 <code>factor = exp(N(μ, σ))</code>로 산출됩니다. 입력 성장률 μ는 <b>중앙값(기하) 실질 드리프트</b>로 해석되어 변동성 드래그로 인한 중앙값 처짐이 제거되며, 수익 팩터는 항상 양수입니다(자산 음수 방지).</p>
+                    <p>• <b>배당/분배 모형:</b> 분배율은 NAV에 대해 <b>일정 비율로 고정</b>됩니다(절대 배당금은 NAV 성장으로 자동 증가). '배당 성장률'은 수익률을 복리로 부풀리지 않고 해당 슬리브의 <b>연 가격 드리프트에 가산</b>됩니다.</p>
+                    <p>• <b>비거주자 과세:</b> 현지 과세 대상 = <b>송금된 배당 소득만</b>. 캐나다 원천징수 완료 연금과 <b>원금 매각분(자본 인출)은 과세 제외</b>. 연금만으로 지출이 커버되면 세금 0, 잉여 연금은 연말 리밸런싱 재투자됩니다.</p>
+                    <p>• <b>FX 리스크:</b> 몬테카를로는 환율을 로그정규 랜덤워크로 진화시켜 통화 불일치 리스크를 반영합니다(심플은 연 추세만 적용).</p>
+                    <p>• <b>시작 정렬(t0):</b> 초기자산 합계를 목표비중으로 정렬 후 시작합니다. 연산 순서: 가격변동 → 배당확정 → (세후연금→배당→원금) 지출충당 → 송금배당 과세 → 잔여배당 재투자 → 연금잉여 가산 → 목표비중 강제 리밸런싱.</p>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let myChartInstance = null;
+
+        // ---------- 입력 헬퍼 (NaN/공란 방어) ----------
+        function getNum(id, def = 0) {
+            const el = document.getElementById(id);
+            if (!el) return def;
+            const v = parseFloat(el.value);
+            return isNaN(v) ? def : v;
+        }
+
+        function toggleCountryOptions() {
+            const country = document.querySelector('input[name="country"]:checked').value;
+            const exUnit = document.getElementById('exchangeRateUnit');
+            const myFsi = document.getElementById('malaysiaFsiArea');
+            const exRate = document.getElementById('exchangeRate');
+            const caTax = document.getElementById('caTaxRate');
+
+            if (country === 'TH') {
+                exUnit.innerText = 'THB 기준';
+                myFsi.style.display = 'none';
+                if (exRate.value == '3.3') exRate.value = '25.0';
+                caTax.value = 25; // 캐나다-태국 조약: 캐나다 25% 과세
+            } else {
+                exUnit.innerText = 'MYR 기준';
+                myFsi.style.display = 'flex';
+                if (exRate.value == '25.0') exRate.value = '3.3';
+                caTax.value = 15; // 캐나다-말련 조약: 정기연금 원천징수 15% 캡
+            }
+        }
+
+        function validateWeights() {
+            const wG = getNum('wGrowth', 0);
+            const wC = getNum('wCc', 0);
+            const wD = getNum('wDiv', 0);
+            const total = wG + wC + wD;
+
+            const checkLabel = document.getElementById('weightCheck');
+            checkLabel.innerText = `합계: ${total}%`;
+            if (Math.abs(total - 100) < 0.5) {
+                checkLabel.className = "text-xs text-emerald-400 font-mono";
+                return true;
+            } else {
+                checkLabel.className = "text-xs text-rose-400 font-mono font-bold";
+                return false;
+            }
+        }
+
+        // ---------- 다중 크래시 행 (개수 제한 없음) ----------
+        function addCrashRow(year = 2030, drop = 30, recovery = 25) {
+            const wrap = document.getElementById('crashRows');
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-12 gap-2 items-center crash-row';
+            div.innerHTML = `
+                <input type="number" class="cr-year col-span-4 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${year}">
+                <input type="number" class="cr-drop col-span-3 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${drop}">
+                <input type="number" class="cr-rec col-span-3 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${recovery}">
+                <button onclick="removeCrashRow(this)" class="col-span-2 text-rose-400 hover:text-rose-300 text-xs cursor-pointer">삭제</button>
+            `;
+            wrap.appendChild(div);
+        }
+        function removeCrashRow(btn) {
+            const row = btn.closest('.crash-row');
+            if (row) row.remove();
+        }
+        function getCrashEvents() {
+            return [...document.querySelectorAll('.crash-row')].map(r => ({
+                year: parseInt(r.querySelector('.cr-year').value),
+                drop: (parseFloat(r.querySelector('.cr-drop').value) || 0) / 100,
+                recovery: (parseFloat(r.querySelector('.cr-rec').value) || 0) / 100
+            })).filter(e => !isNaN(e.year));
+        }
+
+        // ---------- 표준정규 난수 (Box-Muller) ----------
+        function randn() {
+            let u = 0, v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+        // 로그정규 수익 팩터: 중앙값 = e^mean (기하 드리프트 = 입력값), 항상 양수
+        function lognormalFactor(mean, sd) {
+            return Math.exp(mean + sd * randn());
+        }
+        // 일반 정규 (수익률/FX/분배율 draw용)
+        function normalDraw(mean, sd) {
+            return mean + sd * randn();
+        }
+
+        // ---------- 세금 ----------
+        function calculateThaiTax(remitLocal) {
+            if (remitLocal <= 0) return 0;
+            const brackets = [
+                { limit: 150000, rate: 0.00 }, { limit: 300000, rate: 0.05 },
+                { limit: 500000, rate: 0.10 }, { limit: 750000, rate: 0.15 },
+                { limit: 1000000, rate: 0.20 }, { limit: 2000000, rate: 0.25 },
+                { limit: 5000000, rate: 0.30 }, { limit: Infinity, rate: 0.35 }
+            ];
+            return applyBrackets(remitLocal, brackets);
+        }
+        function calculateMalaysianTax(remitLocal, isExempt) {
+            if (isExempt || remitLocal <= 0) return 0;
+            const brackets = [
+                { limit: 5000, rate: 0.00 }, { limit: 20000, rate: 0.01 },
+                { limit: 35000, rate: 0.03 }, { limit: 50000, rate: 0.06 },
+                { limit: 70000, rate: 0.11 }, { limit: 100000, rate: 0.19 },
+                { limit: 400000, rate: 0.25 }, { limit: 600000, rate: 0.26 },
+                { limit: 2000000, rate: 0.28 }, { limit: Infinity, rate: 0.30 }
+            ];
+            return applyBrackets(remitLocal, brackets);
+        }
+        function applyBrackets(amount, brackets) {
+            let tax = 0, prev = 0, remaining = amount;
+            for (let i = 0; i < brackets.length; i++) {
+                let range = brackets[i].limit - prev;
+                if (remaining > range) {
+                    tax += range * brackets[i].rate;
+                    remaining -= range;
+                    prev = brackets[i].limit;
+                } else {
+                    tax += remaining * brackets[i].rate;
+                    break;
+                }
+            }
+            return tax;
+        }
+
+        // ---------- 시뮬레이션 진입점 (UI 프리징 방지) ----------
+        function runSimulation(mode) {
+            if (!validateWeights()) {
+                alert("자산 비중의 합계가 100%가 되도록 수정해 주십시오.");
+                return;
+            }
+            const startYear = parseInt(document.getElementById('startYear').value);
+            const endYear = parseInt(document.getElementById('endYear').value);
+            if (isNaN(startYear) || isNaN(endYear) || (endYear - startYear + 1) <= 0) {
+                alert("종료년도는 시작년도보다 크거나 같아야 합니다.");
+                return;
+            }
+
+            const btnS = document.getElementById('btnSimple');
+            const btnM = document.getElementById('btnMonte');
+            btnS.disabled = true; btnM.disabled = true;
+            btnS.classList.add('opacity-50'); btnM.classList.add('opacity-50');
+
+            if (mode === 'monte') {
+                document.getElementById('simBadge').innerText = "계산 중...";
+                document.getElementById('simBadge').className = "text-xs px-2 py-0.5 rounded font-medium bg-gray-700 text-gray-200 animate-pulse";
+            }
+
+            // setTimeout으로 렌더 양보 후 무거운 연산 실행
+            setTimeout(() => {
+                try {
+                    execute(mode, startYear, endYear);
+                } finally {
+                    btnS.disabled = false; btnM.disabled = false;
+                    btnS.classList.remove('opacity-50'); btnM.classList.remove('opacity-50');
+                }
+            }, 20);
+        }
+
+        function execute(mode, startYear, endYear) {
+            const duration = endYear - startYear + 1;
+            const country = document.querySelector('input[name="country"]:checked').value;
+            const exRate0 = getNum('exchangeRate', 1) || 1;
+            const myFsiExempt = document.getElementById('myFsiExempt').checked;
+
+            const grossPension = getNum('grossPension', 0);
+            const caTaxRate = getNum('caTaxRate', 0);
+            const baseExpenseLocal = getNum('baseExpense', 0);
+
+            const wG = getNum('wGrowth', 0) / 100;
+            const wC = getNum('wCc', 0) / 100;
+            const wD = getNum('wDiv', 0) / 100;
+
+            // 슬리브별 연 가격 드리프트: 배당성장률을 가격 드리프트에 가산(수익률 복리 폭등 제거)
+            const driftGrowth = getNum('rateGrowth', 0) / 100;
+            const volGrowth = getNum('volGrowth', 0) / 100;
+
+            const driftCc = (getNum('rateCc', 0) + getNum('divGgrowthCc', 0)) / 100;
+            const volCc = getNum('volCc', 0) / 100;
+            const yieldCc = getNum('yieldCc', 0) / 100;       // 고정 분배율
+            const divVolCc = getNum('divVolCc', 0) / 100;
+
+            const driftDiv = (getNum('rateDiv', 0) + getNum('divGgrowthDiv', 0)) / 100;
+            const volDiv = getNum('volDiv', 0) / 100;
+            const yieldDiv = getNum('yieldDiv', 0) / 100;     // 고정 배당률
+            const divVolDiv = getNum('divVolDiv', 0) / 100;
+
+            const crashTrigger = getNum('crashTrigger', 20) / 100;
+            const expenseReduction = getNum('expenseReduction', 0) / 100;
+            const ccMultiplier = getNum('ccMultiplier', 0);
+
+            const fxDrift = getNum('fxDrift', 0) / 100;
+            const fxVol = getNum('fxVol', 0) / 100;
+
+            // t0 정렬: 초기자산 합계를 목표비중으로 배분
+            const totalInit = getNum('initGrowth', 0) + getNum('initCc', 0) + getNum('initDiv', 0);
+
+            const netPensionCAD = grossPension * (1 - (caTaxRate / 100));
+
+            let yearsArray = [];
+            for (let y = startYear; y <= endYear; y++) yearsArray.push(y);
+
+            // 다중 크래시 룩업
+            const crashEvents = getCrashEvents();
+            const dropMap = {}, recMap = {};
+            crashEvents.forEach(e => { dropMap[e.year] = e.drop; recMap[e.year + 1] = e.recovery; });
+
+            // ---- 단일 경로 1회 실행 함수 (심플/몬테 공용) ----
+            function runOnePath(isMonte) {
+                let assetGrowth = totalInit * wG;
+                let assetCc = totalInit * wC;
+                let assetDiv = totalInit * wD;
+                let exRate = exRate0;
+
+                let trajectory = [];
+                let taxTotal = 0;
+                let depleted = null;
+
+                for (let i = 0; i < duration; i++) {
+                    const currentYear = startYear + i;
+
+                    // FX 진화
+                    if (isMonte) exRate *= Math.exp(normalDraw(fxDrift, fxVol));
+                    else exRate *= (1 + fxDrift);
+                    if (exRate <= 0) exRate = 0.0001;
+
+                    let totalStart = assetGrowth + assetCc + assetDiv;
+                    if (totalStart <= 0) {
+                        trajectory.push(0);
+                        if (depleted === null) depleted = currentYear;
+                        continue;
+                    }
+
+                    // 1. 가격 변동 + 크래시 판정
+                    let isCrash = false;
+                    let gChange, cChange, dChange;
+
+                    if (isMonte) {
+                        let fG = lognormalFactor(driftGrowth, volGrowth);
+                        let fC = lognormalFactor(driftCc, volCc);
+                        let fD = lognormalFactor(driftDiv, volDiv);
+                        gChange = fG - 1; cChange = fC - 1; dChange = fD - 1;
+                        if (gChange <= -crashTrigger) isCrash = true;
+                    } else {
+                        gChange = driftGrowth; cChange = driftCc; dChange = driftDiv;
+                        if (dropMap[currentYear] !== undefined) {
+                            const dr = dropMap[currentYear];
+                            gChange = -dr; cChange = -dr; dChange = -dr;
+                            if (dr >= crashTrigger) isCrash = true;
+                        } else if (recMap[currentYear] !== undefined) {
+                            const rc = recMap[currentYear];
+                            gChange = rc; cChange = rc; dChange = rc;
+                        }
+                    }
+
+                    assetGrowth *= (1 + gChange);
+                    assetCc *= (1 + cChange);
+                    assetDiv *= (1 + dChange);
+                    if (assetGrowth < 0) assetGrowth = 0;
+                    if (assetCc < 0) assetCc = 0;
+                    if (assetDiv < 0) assetDiv = 0;
+
+                    // 2. 분배율/지출 확정 (분배율은 NAV 대비 고정)
+                    let activeExpenseLocal = baseExpenseLocal;
+                    let ccYield = isMonte ? Math.max(0, normalDraw(yieldCc, divVolCc)) : yieldCc;
+                    let divYield = isMonte ? Math.max(0, normalDraw(yieldDiv, divVolDiv)) : yieldDiv;
+
+                    if (isCrash) {
+                        activeExpenseLocal = baseExpenseLocal * (1 - expenseReduction);
+                        let premium = isMonte ? Math.abs(gChange) * ccMultiplier : Math.abs(gChange) * ccMultiplier;
+                        ccYield += premium;
+                    }
+
+                    let expenseCAD = activeExpenseLocal / exRate;
+
+                    // 3. 인컴 기반 지출 충당 (연금 → 배당 → 원금)
+                    let ccDividend = assetCc * ccYield;
+                    let divDividend = assetDiv * divYield;
+                    let totalDividends = ccDividend + divDividend;
+
+                    let remaining = expenseCAD;
+                    let unusedCcDiv = ccDividend;
+                    let unusedDivDiv = divDividend;
+
+                    if (remaining > 0) {
+                        if (netPensionCAD >= remaining) remaining = 0;
+                        else remaining -= netPensionCAD;
+                    }
+                    if (remaining > 0) {
+                        const useCc = Math.min(unusedCcDiv, remaining);
+                        unusedCcDiv -= useCc; remaining -= useCc;
+                    }
+                    if (remaining > 0) {
+                        const useDiv = Math.min(unusedDivDiv, remaining);
+                        unusedDivDiv -= useDiv; remaining -= useDiv;
+                    }
+
+                    // 4. 원금 매각 시퀀스
+                    let shortfall = remaining;
+                    if (shortfall > 0) {
+                        const sellCc = Math.min(assetCc, shortfall);
+                        assetCc -= sellCc; shortfall -= sellCc;
+                        if (shortfall > 0) {
+                            const sellDiv = Math.min(assetDiv, shortfall);
+                            assetDiv -= sellDiv; shortfall -= sellDiv;
+                        }
+                        if (shortfall > 0) {
+                            const sellG = Math.min(assetGrowth, shortfall);
+                            assetGrowth -= sellG; shortfall -= sellG;
+                        }
+                    }
+
+                    // 5. 과세: 송금된 배당 소득만 (연금·원금 제외)
+                    let dividendsSpent = totalDividends - (unusedCcDiv + unusedDivDiv);
+                    let remittedCAD = Math.max(0, dividendsSpent);
+                    let remittedLocal = remittedCAD * exRate;
+                    let localTax = (country === 'TH')
+                        ? calculateThaiTax(remittedLocal)
+                        : calculateMalaysianTax(remittedLocal, myFsiExempt);
+                    let taxCAD = localTax / exRate;
+                    taxTotal += taxCAD;
+
+                    let postTax = assetGrowth + assetCc + assetDiv - taxCAD;
+                    if (postTax <= 0) {
+                        assetGrowth = 0; assetCc = 0; assetDiv = 0;
+                        trajectory.push(0);
+                        if (depleted === null) depleted = currentYear;
+                        continue; // 고갈 시 재투자/리밸런싱 건너뜀 (부활 방지)
+                    } else {
+                        const sum = assetGrowth + assetCc + assetDiv;
+                        const ratio = postTax / sum;
+                        assetGrowth *= ratio; assetCc *= ratio; assetDiv *= ratio;
+                    }
+
+                    // 6. 잔여 배당 재투자 (합계에만 반영, 비중은 7단계서 정렬)
+                    let pensionSurplus = netPensionCAD > expenseCAD ? (netPensionCAD - expenseCAD) : 0;
+                    let endTotal = assetGrowth + assetCc + assetDiv + unusedCcDiv + unusedDivDiv + pensionSurplus;
+
+                    // 7. 목표비중 강제 리밸런싱
+                    if (endTotal <= 0) {
+                        assetGrowth = 0; assetCc = 0; assetDiv = 0;
+                        trajectory.push(0);
+                        if (depleted === null) depleted = currentYear;
+                    } else {
+                        assetGrowth = endTotal * wG;
+                        assetCc = endTotal * wC;
+                        assetDiv = endTotal * wD;
+                        trajectory.push(endTotal);
+                    }
+                }
+                return { trajectory, taxTotal, depleted, finalAsset: assetGrowth + assetCc + assetDiv };
+            }
+
+            // ---------- 모드별 처리 ----------
+            if (mode === 'simple') {
+                document.getElementById('simBadge').innerText = "심플 모드";
+                document.getElementById('simBadge').className = "text-xs px-2 py-0.5 rounded font-medium bg-amber-900/40 text-amber-400";
+
+                const r = runOnePath(false);
+                document.getElementById('resSurvivalRate').innerText = r.finalAsset > 0 ? "생존 (단일)" : "고갈 (단일)";
+                document.getElementById('resDepletionYear').innerText = r.depleted ? `${r.depleted}년` : "고갈 없음";
+                document.getElementById('resTotalTax').innerText = `${Math.round(r.taxTotal).toLocaleString()} CAD`;
+
+                updateChart(yearsArray, [{
+                    label: '실질 자산 총액 잔액 (Simple CAD)',
+                    data: r.trajectory,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true, tension: 0.1
+                }]);
+
+            } else {
+                document.getElementById('simBadge').innerText = "몬테카를로 1,000회";
+                document.getElementById('simBadge').className = "text-xs px-2 py-0.5 rounded font-medium bg-teal-900/40 text-teal-400";
+
+                const N = 1000;
+                let allTraj = [], depletions = [], taxes = [];
+                for (let s = 0; s < N; s++) {
+                    const r = runOnePath(true);
+                    allTraj.push(r.trajectory);
+                    if (r.depleted !== null) depletions.push(r.depleted);
+                    taxes.push(r.taxTotal);
+                }
+
+                let p10 = [], p50 = [], p90 = [], survival = 0;
+                for (let i = 0; i < duration; i++) {
+                    let vals = [];
+                    for (let s = 0; s < N; s++) vals.push(allTraj[s][i]);
+                    vals.sort((a, b) => a - b);
+                    p10.push(vals[Math.floor(N * 0.1)]);
+                    p50.push(vals[Math.floor(N * 0.5)]);
+                    p90.push(vals[Math.floor(N * 0.9)]);
+                    if (i === duration - 1) {
+                        for (let s = 0; s < N; s++) if (allTraj[s][i] > 0) survival++;
+                    }
+                }
+
+                let meanTax = taxes.reduce((a, b) => a + b, 0) / N;
+                let survRate = (survival / N) * 100;
+                let avgDep = depletions.length > 0
+                    ? Math.round(depletions.reduce((a, b) => a + b, 0) / depletions.length) + "년"
+                    : "고갈 위험 극소";
+
+                document.getElementById('resSurvivalRate').innerText = `${survRate.toFixed(1)}%`;
+                document.getElementById('resDepletionYear').innerText = avgDep;
+                document.getElementById('resTotalTax').innerText = `${Math.round(meanTax).toLocaleString()} CAD`;
+
+                updateChart(yearsArray, [
+                    { label: '낙관 (90th Pctl)', data: p90, borderColor: '#10b981', backgroundColor: 'transparent', borderDash: [5, 5], tension: 0.1 },
+                    { label: '중위 (Median)', data: p50, borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.05)', fill: true, tension: 0.1 },
+                    { label: '비관 (10th Pctl)', data: p10, borderColor: '#ef4444', backgroundColor: 'transparent', borderDash: [5, 5], tension: 0.1 }
+                ]);
+            }
+        }
+
+        function updateChart(labels, datasets) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if (myChartInstance) myChartInstance.destroy();
+            myChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 11 } } } },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+                        y: {
+                            grid: { color: '#1f2937' },
+                            ticks: {
+                                color: '#9ca3af', font: { size: 10 },
+                                callback: function (value) { return (value / 1000).toLocaleString() + 'k'; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        window.onload = function () {
+            addCrashRow(2030, 30, 25); // 기본 크래시 1개
+            toggleCountryOptions();
+            validateWeights();
+            runSimulation('simple');
+        };
+    </script>
+</body>
+</html>

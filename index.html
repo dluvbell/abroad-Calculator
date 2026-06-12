@@ -73,16 +73,25 @@
                 <div>
                     <h2 class="text-sm font-semibold text-teal-400 mb-3 uppercase tracking-wider">2. 인컴 & 지출 설정</h2>
                     <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">연 연금 총액 (Gross CAD)</label>
-                            <input type="number" id="grossPension" value="40000" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                        <div class="bg-gray-900 p-3 rounded border border-gray-800">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-gray-300">인컴 명세 (CAD · 기간별 가변)</span>
+                                <button onclick="addIncomeRow()" class="text-[11px] bg-teal-700 hover:bg-teal-600 text-white px-2 py-0.5 rounded cursor-pointer">+ 인컴 항목 추가</button>
+                            </div>
+                            <label class="flex items-center text-xs text-gray-300 cursor-pointer select-none mb-2">
+                                <input type="checkbox" id="includeSpouse" checked onchange="runSimulation('simple')" class="mr-1.5 accent-teal-500"> 배우자 포함 (태국: 2인 분리과세 적용 / 말레이시아 FSI 비과세 시 영향 없음)
+                            </label>
+                            <p class="text-[10px] text-gray-500 mb-2">※ 금액은 <b>실수령 전 Gross CAD</b>. 각 항목에 <b>캐나다 원천(%)</b>·<b>현지 과세여부</b>·<b>귀속(본인/배우자)</b>·기간을 지정합니다. 현지 과세는 송금·지출된 부분에만 부과됩니다.</p>
+                            <div id="incomeRows" class="space-y-2"></div>
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-400 mb-1">캐나다 원천징수세율 (%)</label>
-                            <input type="number" id="caTaxRate" value="25" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
-                            <span class="text-[10px] text-gray-500 block mt-0.5">조약: TH 25% / MY 15%</span>
-                        </div>
+                    </div>
+                </div>
 
+                <hr class="border-gray-800">
+
+                <div>
+                    <h2 class="text-sm font-semibold text-teal-400 mb-3 uppercase tracking-wider">2-2. 지출 설정</h2>
+                    <div class="space-y-3">
                         <div class="bg-gray-900 p-3 rounded border border-gray-800">
                             <div class="flex justify-between items-center mb-2">
                                 <span class="text-xs font-bold text-gray-300">지출 명세 (CAD · 기간별 가변)</span>
@@ -217,18 +226,30 @@
                     <h2 class="text-sm font-semibold text-teal-400 mb-3 uppercase tracking-wider">4. 국면 제어 및 가변 지출</h2>
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label class="block text-xs text-gray-400 mb-1">크래시 하락률 트리거 (%)</label>
-                            <input type="number" id="crashTrigger" value="20" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <label class="block text-xs text-gray-400 mb-1">커버드콜 할증 트리거 (%)</label>
+                            <input type="number" id="ccCrashTrigger" value="20" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <span class="text-[10px] text-gray-500 block mt-0.5">이 폭 이상 하락 시 CC 프리미엄↑</span>
                         </div>
                         <div>
-                            <label class="block text-xs text-gray-400 mb-1">지출 줄어드는 비율 (%)</label>
-                            <input type="number" id="expenseReduction" value="15" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+                            <label class="block text-xs text-gray-400 mb-1">커버드콜 변동성 할증 계수</label>
+                            <input type="number" id="ccMultiplier" value="0.2" step="0.05" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="block text-xs text-gray-400 mb-1">커버드콜 변동성 할증 계수</label>
-                        <input type="number" id="ccMultiplier" value="0.2" step="0.05" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-teal-500">
+
+                    <div class="bg-gray-900 p-3 rounded border border-gray-800 mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-teal-400">▼ 자산 하락 대비 가변 지출 규칙</span>
+                            <button onclick="addReductionRule()" class="text-[11px] bg-teal-700 hover:bg-teal-600 text-white px-2 py-0.5 rounded cursor-pointer">+ 규칙 추가</button>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mb-2">※ 당해 주가 하락폭이 트리거 이상이면 해당 규칙의 비율로 지출 축소. 트리거가 <b>큰 규칙부터</b> 검사하여 <b>첫 매칭 1개만</b> 적용(없으면 100%).</p>
+                        <div class="grid grid-cols-12 gap-2 mb-1 text-[10px] text-gray-500">
+                            <span class="col-span-5">자산 하락률 트리거(%)</span>
+                            <span class="col-span-5">유지할 생활비 비율(%)</span>
+                            <span class="col-span-2"></span>
+                        </div>
+                        <div id="reductionRows" class="space-y-1.5"></div>
                     </div>
+
                     <div class="bg-gray-900 p-3 rounded border border-gray-800">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-xs font-bold text-amber-400">▼ 심플 시뮬레이션 전용 다중 크래시</span>
@@ -286,9 +307,9 @@
                     <p class="text-gray-300 font-medium">💡 핵심 연산 매커니즘 (정정 통합본 v2)</p>
                     <p>• <b>수익률 모형(몬테카를로):</b> 자산 성장은 로그정규분포 <code>factor = exp(N(μ, σ))</code>로 산출됩니다. 입력 성장률 μ는 <b>중앙값(기하) 실질 드리프트</b>로 해석되어 변동성 드래그로 인한 중앙값 처짐이 제거되며, 수익 팩터는 항상 양수입니다(자산 음수 방지).</p>
                     <p>• <b>배당/분배 모형:</b> 분배율은 NAV에 대해 <b>일정 비율로 고정</b>됩니다(절대 배당금은 NAV 성장으로 자동 증가). '배당 성장률'은 수익률을 복리로 부풀리지 않고 해당 슬리브의 <b>연 가격 드리프트에 가산</b>됩니다.</p>
-                    <p>• <b>비거주자 과세:</b> 현지 과세 대상 = <b>송금된 배당 소득만</b>. 캐나다 원천징수 완료 연금과 <b>원금 매각분(자본 인출)은 과세 제외</b>. 연금만으로 지출이 커버되면 세금 0, 잉여 연금은 연말 리밸런싱 재투자됩니다.</p>
+                    <p>• <b>비거주자 과세:</b> 태국으로 <b>송금(지출 충당)된 돈에 과세</b> — 「현지 과세」 인컴 + 송금 배당 + <b>자산 매각분 중 차익(gain)만</b>. 풀 단위 원가추적으로 매각액의 차익비율만 과세하고 원금 회수분은 비과세(조약 비과세 인컴도 제외). 각 인컴은 <b>Gross CAD × (1−캐나다원천%)</b> 실수령. <b>배우자 포함</b> 시 인컴은 귀속대로, <b>자산 유래 과세 송금은 부부 50/50</b>로 나눠 태국 누진세 2회 분리 → 평탄화 최적. 말레이시아는 FSI 비과세 시 0.</p>
                     <p>• <b>FX 리스크:</b> 몬테카를로는 환율을 로그정규 랜덤워크로 진화시켜 통화 불일치 리스크를 반영합니다(심플은 연 추세만 적용).</p>
-                    <p>• <b>시작 정렬(t0):</b> 초기자산 합계를 목표비중으로 정렬 후 시작합니다. 연산 순서: 가격변동 → 배당확정 → (세후연금→배당→원금) 지출충당 → 송금배당 과세 → 잔여배당 재투자 → 연금잉여 가산 → 목표비중 강제 리밸런싱.</p>
+                    <p>• <b>시작 정렬(t0):</b> 초기자산 합계를 목표비중으로 정렬 후 시작합니다. 연산 순서: 가격변동 → 배당확정 → (실수령인컴→배당→원금) 지출충당 → 송금 인컴·배당 과세(배우자 분리) → 잔여배당 재투자 → 인컴잉여 가산 → 목표비중 강제 리밸런싱.</p>
                 </div>
 
             </div>
@@ -312,18 +333,15 @@
             const exUnit = document.getElementById('exchangeRateUnit');
             const myFsi = document.getElementById('malaysiaFsiArea');
             const exRate = document.getElementById('exchangeRate');
-            const caTax = document.getElementById('caTaxRate');
 
             if (country === 'TH') {
                 exUnit.innerText = 'THB 기준';
                 myFsi.style.display = 'none';
                 if (exRate.value == '3.3') exRate.value = '25.0';
-                caTax.value = 25; // 캐나다-태국 조약: 캐나다 25% 과세
             } else {
                 exUnit.innerText = 'MYR 기준';
                 myFsi.style.display = 'flex';
                 if (exRate.value == '25.0') exRate.value = '3.3';
-                caTax.value = 15; // 캐나다-말련 조약: 정기연금 원천징수 15% 캡
             }
         }
 
@@ -369,6 +387,30 @@
             })).filter(e => !isNaN(e.year));
         }
 
+        // ---------- 자산 하락 대비 가변 지출 규칙 (조립식) ----------
+        function addReductionRule(drop = 20, ratio = 90) {
+            const wrap = document.getElementById('reductionRows');
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-12 gap-2 items-center reduction-row';
+            div.innerHTML = `
+                <input type="number" class="rr-drop col-span-5 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${drop}">
+                <input type="number" class="rr-ratio col-span-5 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${ratio}">
+                <button onclick="removeReductionRule(this)" class="col-span-2 text-rose-400 hover:text-rose-300 text-xs cursor-pointer">삭제</button>
+            `;
+            wrap.appendChild(div);
+        }
+        function removeReductionRule(btn) {
+            const row = btn.closest('.reduction-row');
+            if (row) row.remove();
+        }
+        // 규칙 수집 + 트리거 내림차순 정렬(큰 하락률 먼저 검사)
+        function getReductionRules() {
+            return [...document.querySelectorAll('.reduction-row')].map(r => ({
+                drop: (parseFloat(r.querySelector('.rr-drop').value) || 0) / 100,
+                ratio: (parseFloat(r.querySelector('.rr-ratio').value) || 100) / 100
+            })).filter(e => e.drop > 0).sort((a, b) => b.drop - a.drop);
+        }
+
         // ---------- 가변 지출 명세 행 (개수 제한 없음) ----------
         function addExpenseRow(name = '신규 항목', amount = 0, start = 2026, end = 2060) {
             const wrap = document.getElementById('expenseRows');
@@ -403,6 +445,70 @@
                 if (it.start <= year && year <= it.end) total += it.amount;
             }
             return total;
+        }
+
+        // ---------- 인컴 명세 행 (타입/귀속/현지과세/캐나다원천/기간) ----------
+        function addIncomeRow(name = '신규 인컴', amount = 0, caWh = 0, taxable = false, owner = 'self', start = 2026, end = 2060) {
+            const wrap = document.getElementById('incomeRows');
+            const div = document.createElement('div');
+            div.className = 'bg-gray-950 p-2 rounded border border-gray-800 income-row';
+            div.innerHTML = `
+                <div class="grid grid-cols-12 gap-1.5 items-center mb-1.5">
+                    <input type="text" class="in-name col-span-9 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${name}">
+                    <button onclick="removeIncomeRow(this)" class="col-span-3 text-rose-400 hover:text-rose-300 text-xs cursor-pointer text-right pr-1" title="삭제">✕ 삭제</button>
+                </div>
+                <div class="grid grid-cols-12 gap-1.5 items-center mb-1.5">
+                    <div class="col-span-6">
+                        <span class="text-[9px] text-gray-500 block leading-none mb-0.5">연 금액(Gross CAD)</span>
+                        <input type="number" class="in-amt w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white" value="${amount}">
+                    </div>
+                    <div class="col-span-6">
+                        <span class="text-[9px] text-gray-500 block leading-none mb-0.5">귀속</span>
+                        <select class="in-owner w-full bg-gray-900 border border-gray-700 rounded px-1 py-1 text-xs text-white">
+                            <option value="self" ${owner === 'self' ? 'selected' : ''}>본인</option>
+                            <option value="spouse" ${owner === 'spouse' ? 'selected' : ''}>배우자</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-12 gap-1.5 items-center">
+                    <div class="col-span-3">
+                        <span class="text-[9px] text-gray-500 block leading-none mb-0.5">加원천(%)</span>
+                        <input type="number" class="in-cawh w-full bg-gray-900 border border-gray-700 rounded px-1.5 py-1 text-xs text-white" value="${caWh}">
+                    </div>
+                    <div class="col-span-3">
+                        <span class="text-[9px] text-gray-500 block leading-none mb-0.5">현지세</span>
+                        <select class="in-tax w-full bg-gray-900 border border-gray-700 rounded px-1 py-1 text-xs text-white">
+                            <option value="no" ${!taxable ? 'selected' : ''}>비과세</option>
+                            <option value="yes" ${taxable ? 'selected' : ''}>과세</option>
+                        </select>
+                    </div>
+                    <div class="col-span-3">
+                        <span class="text-[9px] text-gray-500 block leading-none mb-0.5">시작</span>
+                        <input type="number" class="in-start w-full bg-gray-900 border border-gray-700 rounded px-1.5 py-1 text-xs text-white" value="${start}">
+                    </div>
+                    <div class="col-span-3">
+                        <span class="text-[9px] text-gray-500 block leading-none mb-0.5">종료</span>
+                        <input type="number" class="in-end w-full bg-gray-900 border border-gray-700 rounded px-1.5 py-1 text-xs text-white" value="${end}">
+                    </div>
+                </div>
+            `;
+            wrap.appendChild(div);
+        }
+        function removeIncomeRow(btn) {
+            const row = btn.closest('.income-row');
+            if (row) row.remove();
+        }
+        // 인컴 명세 수집
+        function getIncomeItems() {
+            return [...document.querySelectorAll('.income-row')].map(r => ({
+                name: r.querySelector('.in-name').value,
+                amount: parseFloat(r.querySelector('.in-amt').value) || 0,
+                caWh: (parseFloat(r.querySelector('.in-cawh').value) || 0) / 100,
+                taxable: r.querySelector('.in-tax').value === 'yes',
+                owner: r.querySelector('.in-owner').value,
+                start: parseInt(r.querySelector('.in-start').value),
+                end: parseInt(r.querySelector('.in-end').value)
+            })).filter(e => !isNaN(e.start) && !isNaN(e.end));
         }
 
         // ---------- 표준정규 난수 (Box-Muller) ----------
@@ -499,8 +605,8 @@
             const exRate0 = getNum('exchangeRate', 1) || 1;
             const myFsiExempt = document.getElementById('myFsiExempt').checked;
 
-            const grossPension = getNum('grossPension', 0);
-            const caTaxRate = getNum('caTaxRate', 0);
+            const incomeItems = getIncomeItems();
+            const includeSpouse = document.getElementById('includeSpouse').checked;
             const expenseItems = getExpenseItems();
 
             const wG = getNum('wGrowth', 0) / 100;
@@ -521,8 +627,8 @@
             const yieldDiv = getNum('yieldDiv', 0) / 100;     // 고정 배당률
             const divVolDiv = getNum('divVolDiv', 0) / 100;
 
-            const crashTrigger = getNum('crashTrigger', 20) / 100;
-            const expenseReduction = getNum('expenseReduction', 0) / 100;
+            const ccCrashTrigger = getNum('ccCrashTrigger', 20) / 100;
+            const reductionRules = getReductionRules();
             const ccMultiplier = getNum('ccMultiplier', 0);
 
             const fxDrift = getNum('fxDrift', 0) / 100;
@@ -531,7 +637,7 @@
             // t0 정렬: 초기자산 합계를 목표비중으로 배분
             const totalInit = getNum('initGrowth', 0) + getNum('initCc', 0) + getNum('initDiv', 0);
 
-            const netPensionCAD = grossPension * (1 - (caTaxRate / 100));
+            // 인컴은 연도별로 가변 → runOnePath 루프 내에서 매년 산출
 
             let yearsArray = [];
             for (let y = startYear; y <= endYear; y++) yearsArray.push(y);
@@ -547,6 +653,7 @@
                 let assetCc = totalInit * wC;
                 let assetDiv = totalInit * wD;
                 let exRate = exRate0;
+                let currentBasis = totalInit; // 풀 단위 투자 원가 (t0 = 전액 원가)
 
                 let trajectory = [];
                 let taxTotal = 0;
@@ -562,12 +669,13 @@
 
                     let totalStart = assetGrowth + assetCc + assetDiv;
                     if (totalStart <= 0) {
+                        currentBasis = 0;
                         trajectory.push(0);
                         if (depleted === null) depleted = currentYear;
                         continue;
                     }
 
-                    // 1. 가격 변동 + 크래시 판정
+                    // 1. 가격 변동 + 커버드콜 할증(isCrash) 판정 — 지출 규칙과 독립
                     let isCrash = false;
                     let gChange, cChange, dChange;
 
@@ -576,13 +684,13 @@
                         let fC = lognormalFactor(driftCc, volCc);
                         let fD = lognormalFactor(driftDiv, volDiv);
                         gChange = fG - 1; cChange = fC - 1; dChange = fD - 1;
-                        if (gChange <= -crashTrigger) isCrash = true;
+                        if (gChange <= -ccCrashTrigger) isCrash = true;
                     } else {
                         gChange = driftGrowth; cChange = driftCc; dChange = driftDiv;
                         if (dropMap[currentYear] !== undefined) {
                             const dr = dropMap[currentYear];
                             gChange = -dr; cChange = -dr; dChange = -dr;
-                            if (dr >= crashTrigger) isCrash = true;
+                            if (dr >= ccCrashTrigger) isCrash = true;
                         } else if (recMap[currentYear] !== undefined) {
                             const rc = recMap[currentYear];
                             gChange = rc; cChange = rc; dChange = rc;
@@ -599,20 +707,41 @@
                     // 2. 분배율/지출 확정 (분배율은 NAV 대비 고정)
                     // 지출은 CAD 기준 입력. 해당 연도 활성 항목만 합산 [start <= year <= end]
                     let baseExpenseThisYear = sumExpenseForYear(expenseItems, currentYear);
-                    let activeExpenseCAD = baseExpenseThisYear;
+
+                    // 가변 지출 규칙 엔진: 당해 하락폭으로 트리거 내림차순 탐색 → 첫 매칭 비율 적용(없으면 100%)
+                    let currentDrop = gChange < 0 ? -gChange : 0;
+                    let keepRatio = 1;
+                    for (const rule of reductionRules) {
+                        if (currentDrop >= rule.drop) { keepRatio = rule.ratio; break; }
+                    }
+                    let activeExpenseCAD = baseExpenseThisYear * keepRatio;
+
                     let ccYield = isMonte ? Math.max(0, normalDraw(yieldCc, divVolCc)) : yieldCc;
                     let divYield = isMonte ? Math.max(0, normalDraw(yieldDiv, divVolDiv)) : yieldDiv;
 
+                    // 커버드콜 변동성 할증: ccCrashTrigger 초과 하락 시 프리미엄 가산 (지출 규칙과 무관)
                     if (isCrash) {
-                        activeExpenseCAD = baseExpenseThisYear * (1 - expenseReduction);
-                        let premium = isMonte ? Math.abs(gChange) * ccMultiplier : Math.abs(gChange) * ccMultiplier;
+                        let premium = Math.abs(gChange) * ccMultiplier;
                         ccYield += premium;
                     }
 
                     // CAD 지출에 FX 변동 반영: t0 환율 대비 현재 환율로 실질 CAD 부담 조정(CAD 강세→지출↓)
                     let expenseCAD = activeExpenseCAD * (exRate0 / exRate);
 
-                    // 3. 인컴 기반 지출 충당 (연금 → 배당 → 원금)
+                    // 3. 인컴 기반 지출 충당 (인컴 → 배당 → 원금)
+                    // 해당 연도 활성 인컴 집계: 실수령(=Gross×(1-加원천)), 현지과세 대상은 귀속별로 분리
+                    let netIncomeTotal = 0, netTaxSelf = 0, netTaxSpouse = 0;
+                    for (const it of incomeItems) {
+                        if (it.start <= currentYear && currentYear <= it.end) {
+                            const net = it.amount * (1 - it.caWh);
+                            netIncomeTotal += net;
+                            if (it.taxable) {
+                                if (includeSpouse && it.owner === 'spouse') netTaxSpouse += net;
+                                else netTaxSelf += net;
+                            }
+                        }
+                    }
+
                     let ccDividend = assetCc * ccYield;
                     let divDividend = assetDiv * divYield;
                     let totalDividends = ccDividend + divDividend;
@@ -622,8 +751,8 @@
                     let unusedDivDiv = divDividend;
 
                     if (remaining > 0) {
-                        if (netPensionCAD >= remaining) remaining = 0;
-                        else remaining -= netPensionCAD;
+                        if (netIncomeTotal >= remaining) remaining = 0;
+                        else remaining -= netIncomeTotal;
                     }
                     if (remaining > 0) {
                         const useCc = Math.min(unusedCcDiv, remaining);
@@ -634,34 +763,55 @@
                         unusedDivDiv -= useDiv; remaining -= useDiv;
                     }
 
-                    // 4. 원금 매각 시퀀스
+                    // 4. 원금/자산 매각 시퀀스 (매각액 추적 → 송금 과세는 차익분만)
+                    // 매각 직전 자산 풀의 차익 비율 산출 (0~1 가드)
+                    let totalPortfolio = assetGrowth + assetCc + assetDiv;
+                    let gainRatio = totalPortfolio > 0
+                        ? Math.min(1, Math.max(0, (totalPortfolio - currentBasis) / totalPortfolio))
+                        : 0;
+
                     let shortfall = remaining;
+                    let assetSold = 0;
                     if (shortfall > 0) {
                         const sellCc = Math.min(assetCc, shortfall);
-                        assetCc -= sellCc; shortfall -= sellCc;
+                        assetCc -= sellCc; shortfall -= sellCc; assetSold += sellCc;
                         if (shortfall > 0) {
                             const sellDiv = Math.min(assetDiv, shortfall);
-                            assetDiv -= sellDiv; shortfall -= sellDiv;
+                            assetDiv -= sellDiv; shortfall -= sellDiv; assetSold += sellDiv;
                         }
                         if (shortfall > 0) {
                             const sellG = Math.min(assetGrowth, shortfall);
-                            assetGrowth -= sellG; shortfall -= sellG;
+                            assetGrowth -= sellG; shortfall -= sellG; assetSold += sellG;
                         }
                     }
 
-                    // 5. 과세: 송금된 배당 소득만 (연금·원금 제외)
-                    let dividendsSpent = totalDividends - (unusedCcDiv + unusedDivDiv);
-                    let remittedCAD = Math.max(0, dividendsSpent);
-                    let remittedLocal = remittedCAD * exRate;
+                    // 5. 과세: 태국으로 송금(지출 충당)된 돈은 모두 과세 대상.
+                    //    = 「현지 과세」 인컴 + 송금 배당 + 자산 매각분(캐피탈/원금 인출 포함). 조약 비과세 인컴만 제외.
+                    //    자산 유래 송금(배당+매각)은 명의를 가르지 않고 부부 50/50로 배분 → 누진 평탄화 최적.
+                    let spentFromIncome = Math.min(netIncomeTotal, expenseCAD);
+                    let incRemitRatio = netIncomeTotal > 0 ? (spentFromIncome / netIncomeTotal) : 0;
+                    let taxIncSelfCAD = netTaxSelf * incRemitRatio;
+                    let taxIncSpouseCAD = netTaxSpouse * incRemitRatio;
+
+                    let dividendsSpent = Math.max(0, totalDividends - (unusedCcDiv + unusedDivDiv));
+                    // 자산 매각은 차익(gainRatio) 부분만 과세, 배당은 100% 과세
+                    let assetRemittedCAD = dividendsSpent + (assetSold * gainRatio);
+                    let assetSelfCAD = includeSpouse ? assetRemittedCAD * 0.5 : assetRemittedCAD;
+                    let assetSpouseCAD = includeSpouse ? assetRemittedCAD * 0.5 : 0;
+
+                    let selfLocal = (taxIncSelfCAD + assetSelfCAD) * exRate;
+                    let spouseLocal = (taxIncSpouseCAD + assetSpouseCAD) * exRate;
+
                     let localTax = (country === 'TH')
-                        ? calculateThaiTax(remittedLocal)
-                        : calculateMalaysianTax(remittedLocal, myFsiExempt);
+                        ? (calculateThaiTax(selfLocal) + calculateThaiTax(spouseLocal))
+                        : (calculateMalaysianTax(selfLocal, myFsiExempt) + calculateMalaysianTax(spouseLocal, myFsiExempt));
                     let taxCAD = localTax / exRate;
                     taxTotal += taxCAD;
 
                     let postTax = assetGrowth + assetCc + assetDiv - taxCAD;
                     if (postTax <= 0) {
                         assetGrowth = 0; assetCc = 0; assetDiv = 0;
+                        currentBasis = 0;
                         trajectory.push(0);
                         if (depleted === null) depleted = currentYear;
                         continue; // 고갈 시 재투자/리밸런싱 건너뜀 (부활 방지)
@@ -671,13 +821,19 @@
                         assetGrowth *= ratio; assetCc *= ratio; assetDiv *= ratio;
                     }
 
-                    // 6. 잔여 배당 재투자 (합계에만 반영, 비중은 7단계서 정렬)
-                    let pensionSurplus = netPensionCAD > expenseCAD ? (netPensionCAD - expenseCAD) : 0;
-                    let endTotal = assetGrowth + assetCc + assetDiv + unusedCcDiv + unusedDivDiv + pensionSurplus;
+                    // 6. 잔여 배당 재투자 + 인컴 잉여 가산 (합계에만 반영, 비중은 7단계서 정렬)
+                    let incomeSurplus = netIncomeTotal > expenseCAD ? (netIncomeTotal - expenseCAD) : 0;
+
+                    // 풀 원가 업데이트: 매각된 원금분 차감 + 신규 재투자 자본(잔여배당+인컴잉여) 가산
+                    currentBasis = currentBasis - (assetSold * (1 - gainRatio)) + (unusedCcDiv + unusedDivDiv + incomeSurplus);
+                    if (currentBasis < 0) currentBasis = 0;
+
+                    let endTotal = assetGrowth + assetCc + assetDiv + unusedCcDiv + unusedDivDiv + incomeSurplus;
 
                     // 7. 목표비중 강제 리밸런싱
                     if (endTotal <= 0) {
                         assetGrowth = 0; assetCc = 0; assetDiv = 0;
+                        currentBasis = 0;
                         trajectory.push(0);
                         if (depleted === null) depleted = currentYear;
                     } else {
@@ -816,6 +972,15 @@
 
         window.onload = function () {
             addCrashRow(2030, 30, 25); // 기본 크래시 1개
+            // 샘플 가변 지출 규칙 (트리거 큰 값부터 검사됨)
+            addReductionRule(35, 80); // 35% 이상 하락 → 생활비 80% 유지
+            addReductionRule(20, 90); // 20% 이상 하락 → 생활비 90% 유지
+            // 샘플 인컴 (Gross CAD · 캐나다원천 · 현지과세 · 귀속 · 기간)
+            // 연금은 캐-태/캐-말 조약상 캐나다 과세 → 현지 비과세 처리. CPP/OAS 개시연도는 나이에 맞게 조정하세요.
+            addIncomeRow('본인 CPP', 12000, 25, false, 'self', 2026, 2060);
+            addIncomeRow('본인 OAS', 8500, 25, false, 'self', 2026, 2060);
+            addIncomeRow('배우자 CPP', 8000, 25, false, 'spouse', 2026, 2060);
+            addIncomeRow('배우자 OAS', 8500, 25, false, 'spouse', 2026, 2060);
             // 샘플 지출 항목 (CAD · 기간별 가변)
             addExpenseRow('기본 생활비', 24000, 2026, 2060);
             addExpenseRow('주거비 (월세)', 12000, 2026, 2060);
